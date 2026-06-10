@@ -1,21 +1,35 @@
+# ---- Stage 1: builder ----
+FROM python:3.11-slim AS builder
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+# ---- Stage 2: runtime ----
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# ultralytics / opencv 需要的系统库
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# 先只拷贝 requirements,利用 Docker 层缓存
-# 只要 requirements 不变,这一层就不重新装依赖
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY --from=builder /install /usr/local
 
-# 再拷贝代码
-COPY app/ ./app/
+RUN useradd -m appuser
+
+COPY --chown=appuser:appuser app/ ./app/
+# 直接拷贝宿主机预下载好的权重
+COPY --chown=appuser:appuser yolov8n.pt ./yolov8n.pt
+
+USER appuser
 
 EXPOSE 8000
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-

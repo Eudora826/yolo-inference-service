@@ -7,4 +7,5 @@ tests/
 .venv/
 venv/
 *.pt
+!yolov8n.pt
 .pytest_cache/
